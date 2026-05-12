@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>霓虹倖存者 3D - Neon Survivor</title>
+    <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
     <style>
@@ -225,12 +227,18 @@
                 display: flex; justify-content: center; align-items: center;
                 color: rgba(255, 255, 255, 0.4); font-size: 14px; font-weight: bold; letter-spacing: 1px;
             }
+            #move-zone::after { content: "左手移動區 (拖曳)"; }
         }
     </style>
 </head>
 <body>
 
     <div id="canvas-container"></div>
+
+    <!-- 背景音樂開關按鈕 (提高 z-index 確保不被擋住) -->
+    <button id="musicToggleBtn" onclick="window.toggleMusic()" class="fixed bottom-4 left-4 z-[1000] bg-black/60 text-cyan-400 border border-cyan-500/50 rounded-full w-12 h-12 flex items-center justify-center text-2xl outline-none cursor-pointer backdrop-blur-md shadow-[0_0_10px_rgba(0,255,255,0.3)] hover:scale-110 transition-transform">
+        🔇
+    </button>
 
     <!-- UI 介面層 -->
     <div id="gameUI">
@@ -252,7 +260,6 @@
                 <div id="bossWarning" data-i18n="boss_warn" class="hidden text-4xl md:text-6xl font-bold text-red-500 boss-warning-text z-50 whitespace-nowrap">
                     ⚠️ 首領來襲 ⚠️
                 </div>
-                <!-- 道具獲得提示文字 -->
                 <div id="powerupText" class="hidden mt-10 text-4xl md:text-5xl font-bold z-50 transition-opacity duration-300 tracking-widest uppercase">
                 </div>
             </div>
@@ -381,7 +388,7 @@
         </div>
     </div>
 
-    <!-- 軍火商店畫面 -->
+    <!-- 軍火商店畫面 (全免費) -->
     <div id="shopScreen" class="screen-overlay hidden">
         <div class="w-full max-w-4xl flex flex-col md:flex-row justify-between items-center md:items-end px-8 mb-4 border-b border-cyan-500/30 pb-4 gap-4">
             <div class="text-center md:text-left">
@@ -403,7 +410,6 @@
                 <button type="button" class="upgrade-btn" id="buyDmgBtn">升級 ($<span id="dmgCost">0</span>)</button>
             </div>
             
-            <!-- 新增的射速升級區塊 -->
             <div class="shop-item">
                 <div data-i18n="s_fr_t" class="text-3xl mb-3">🚀 射速提升</div>
                 <div data-i18n="s_fr_d" class="text-sm text-gray-300 mb-4 flex-grow">縮短武器發射的冷卻時間，提高傾瀉火力的速度。</div>
@@ -453,22 +459,22 @@
             <div class="shop-item" id="weapon-dual">
                 <div data-i18n="s_wp2_t" class="text-3xl mb-3">👯 雙槍</div>
                 <div data-i18n="s_wp2_d" class="text-sm text-gray-300 mb-4 flex-grow">雙倍火力輸出，射速小幅提升，適合走位輸出。</div>
-                <button type="button" class="upgrade-btn" id="buyDualBtn">購買 ($0)</button>
+                <button type="button" class="upgrade-btn" id="buyDualBtn">購買 ($150)</button>
             </div>
             <div class="shop-item" id="weapon-shotgun">
                 <div data-i18n="s_wp3_t" class="text-3xl mb-3">💥 散彈槍</div>
                 <div data-i18n="s_wp3_d" class="text-sm text-gray-300 mb-4 flex-grow">一次發射多發子彈的扇形攻擊，近戰爆發極高。</div>
-                <button type="button" class="upgrade-btn" id="buyShotgunBtn">購買 ($0)</button>
+                <button type="button" class="upgrade-btn" id="buyShotgunBtn">購買 ($400)</button>
             </div>
             <div class="shop-item" id="weapon-ak47">
                 <div data-i18n="s_wp4_t" class="text-3xl mb-3">🔥 突擊步槍</div>
                 <div data-i18n="s_wp4_d" class="text-sm text-gray-300 mb-4 flex-grow">全自動高速連射，單發傷害略低但火力壓制極強。</div>
-                <button type="button" class="upgrade-btn" id="buyAk47Btn">購買 ($0)</button>
+                <button type="button" class="upgrade-btn" id="buyAk47Btn">購買 ($900)</button>
             </div>
             <div class="shop-item" id="weapon-sniper">
                 <div data-i18n="s_wp5_t" class="text-3xl mb-3">🔭 磁軌狙擊槍</div>
                 <div data-i18n="s_wp5_d" class="text-sm text-gray-300 mb-4 flex-grow">極高傷害與彈速，射速緩慢但附帶強大基礎穿透力。</div>
-                <button type="button" class="upgrade-btn" id="buySniperBtn">購買 ($0)</button>
+                <button type="button" class="upgrade-btn" id="buySniperBtn">購買 ($1700)</button>
             </div>
         </div>
         
@@ -496,6 +502,43 @@
     </div>
 
     <script>
+        // --- 音樂系統 ---
+        let bgm = null;
+        let isMusicPlaying = false;
+        let musicStarted = false;
+
+        function initAudio() {
+            if (bgm) return;
+            // 移除 crossOrigin 屬性以避免部分 CDN 或伺服器的跨網域安全阻擋
+            bgm = new Audio('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/sounds/376737_Skullbeatz___Bad_Cat_Macaque.mp3');
+            bgm.loop = true;
+            bgm.volume = 0.3; // 預設音量 30%
+        }
+
+        window.toggleMusic = function() {
+            initAudio();
+            const btn = document.getElementById('musicToggleBtn');
+            if (isMusicPlaying) {
+                bgm.pause();
+                isMusicPlaying = false;
+                if(btn) btn.innerText = '🔇';
+            } else {
+                bgm.play().then(() => {
+                    isMusicPlaying = true;
+                    if(btn) btn.innerText = '🔊';
+                }).catch(e => {
+                    console.warn("主要音樂載入失敗，切換至備用音源:", e);
+                    // 備用無歌詞電子背景音樂 (SoundHelix 穩定來源)
+                    bgm.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3';
+                    bgm.load();
+                    bgm.play().then(() => {
+                        isMusicPlaying = true;
+                        if(btn) btn.innerText = '🔊';
+                    }).catch(err => console.error("備用音樂也載入失敗:", err));
+                });
+            }
+        };
+
         // --- i18n 翻譯字典 ---
         const langDict = {
             zh: {
@@ -525,7 +568,8 @@
                 btn_buy: "購買 ($", btn_upg: "升級 ($", btn_eq: "裝備", btn_eqd: "已裝備",
                 pu_mag: "🧲 磁鐵吸收！", pu_bomb: "💣 全屏核彈！", pu_shield: "🛡️ 無敵護盾！", pu_rapid: "⚡ 急速射擊！",
                 boss_summon: "⚠️ 首領召喚了眷屬！", boss_dash: "⚡ 首領急速衝刺！", boss_gravity: "🕳️ 無法逃脫的引力！",
-                rush_kill_boss: "擊殺首領！", warn_midboss: "⚠️ 小首領來襲 ⚠️", warn_finalboss: "⚠️ 最終首領來襲 ⚠️", clear_finish: "🏆 已完成所有 1000 關卡！"
+                rush_kill_boss: "擊殺首領！", warn_midboss: "⚠️ 小首領來襲 ⚠️", warn_finalboss: "⚠️ 最終首領來襲 ⚠️", clear_finish: "🏆 已完成所有 1000 關卡！",
+                btn_free: "免費獲取"
             },
             en: {
                 title_score: "Score:", title_coins: "Coins:", title_kills: "Kills:", title_hp: "Core HP:",
@@ -554,7 +598,8 @@
                 btn_buy: "BUY ($", btn_upg: "UPGRADE ($", btn_eq: "EQUIP", btn_eqd: "EQUIPPED",
                 pu_mag: "🧲 MAGNET ABSORBED!", pu_bomb: "💣 NUKE DEPLOYED!", pu_shield: "🛡️ INVINCIBILITY!", pu_rapid: "⚡ RAPID FIRE!",
                 boss_summon: "⚠️ BOSS SUMMONED MINIONS!", boss_dash: "⚡ BOSS PHANTOM DASH!", boss_gravity: "🕳️ INESCAPABLE GRAVITY!",
-                rush_kill_boss: "KILL THE BOSS!", warn_midboss: "⚠️ MID-BOSS APPROACHING ⚠️", warn_finalboss: "⚠️ FINAL BOSS APPROACHING ⚠️", clear_finish: "🏆 Cleared all 1000 levels!"
+                rush_kill_boss: "KILL THE BOSS!", warn_midboss: "⚠️ MID-BOSS APPROACHING ⚠️", warn_finalboss: "⚠️ FINAL BOSS APPROACHING ⚠️", clear_finish: "🏆 Cleared all 1000 levels!",
+                btn_free: "FREE"
             }
         };
 
@@ -601,12 +646,13 @@
 
         const WEAPONS = {
             pistol:  { name: "Pistol", cost: 0, fireRate: 400, type: 'single', damageMult: 1.0 },
-            dual:    { name: "Dual Pistols", cost: 250, fireRate: 300, type: 'dual', damageMult: 0.8 }, 
-            shotgun: { name: "Shotgun", cost: 500, fireRate: 800, type: 'spread', damageMult: 0.7 }, 
-            ak47:    { name: "AK-47", cost: 1000, fireRate: 120, type: 'auto', damageMult: 0.5 },
-            sniper:  { name: "Railgun Sniper", cost: 1800, fireRate: 1200, type: 'sniper', damageMult: 3.5 }
+            dual:    { name: "Dual Pistols", cost: 150, fireRate: 300, type: 'dual', damageMult: 0.8 }, 
+            shotgun: { name: "Shotgun", cost: 400, fireRate: 800, type: 'spread', damageMult: 0.7 }, 
+            ak47:    { name: "AK-47", cost: 900, fireRate: 120, type: 'auto', damageMult: 0.5 },
+            sniper:  { name: "Railgun Sniper", cost: 1700, fireRate: 1200, type: 'sniper', damageMult: 3.5 }
         };
 
+        // 恢復正常升級價格公式
         const getCost = (type) => {
             const base = { damage: 30, health: 30, speed: 80, piercing: 200, ricochet: 300, fireRate: 50 };
             const multiplier = { damage: 1.5, health: 1.5, speed: 2, piercing: 2.5, ricochet: 2.5, fireRate: 1.5 };
@@ -686,7 +732,7 @@
         let playerShieldMesh = null;
         
         let projectiles = [], enemies = [], particles = [], loot = [], powerups = [];
-        let spawnInterval;
+        let spawnInterval, powerupInterval;
         let enemyIdCounter = 0;
         let bossSpawnCount = 0; 
         let lastFireTime = 0, isFiring = false, currentAimPos = null;
@@ -772,7 +818,6 @@
                 setupInputs();
                 setupUIEvents();
 
-                // 初始化語言設定
                 window.setLanguage(currentLang);
 
                 window.updateUI();
@@ -843,6 +888,7 @@
             if (isPaused) {
                 pauseStartTime = Date.now();
                 if (spawnInterval) clearInterval(spawnInterval); 
+                if (powerupInterval) clearInterval(powerupInterval);
                 
                 const modeMapLang = { zh: { 'classic': '經典生存', 'rush': '限時突圍', 'hardcore': '無盡深淵', 'level': '主線關卡' }, en: { 'classic': 'Classic', 'rush': 'Time Rush', 'hardcore': 'Hardcore', 'level': 'Campaign' } };
                 const pauseModeEl = document.getElementById('pauseModeText');
@@ -858,6 +904,7 @@
                 else if(currentMode === 'level') currentSpawnRate = Math.max(800, 1800 - (GameData.level.currentLevel * 2));
 
                 if (!bossActive) spawnInterval = setInterval(spawnEnemy, currentSpawnRate); 
+                powerupInterval = setInterval(spawnRandomPowerup, 6000); 
                 pauseScreen?.classList.add('hidden');
             }
         }
@@ -865,6 +912,17 @@
         window.startGame = function(mode) {
             currentMode = mode || 'classic';
             
+            // 首次啟動遊戲時，嘗試自動播放音樂
+            if (!musicStarted) {
+                initAudio();
+                bgm.play().then(() => {
+                    isMusicPlaying = true;
+                    const btn = document.getElementById('musicToggleBtn');
+                    if(btn) btn.innerText = '🔊';
+                }).catch(e => console.warn("瀏覽器阻擋自動播放音樂:", e));
+                musicStarted = true;
+            }
+
             if(currentMode === 'level' && GameData.level.currentLevel > 1000) {
                 alert(t('msg_win1000'));
                 return;
@@ -927,6 +985,10 @@
             pauseScreen?.classList.add('hidden'); shopScreen?.classList.add('hidden');
             
             if (spawnInterval) clearInterval(spawnInterval);
+            if (powerupInterval) clearInterval(powerupInterval);
+            
+            powerupInterval = setInterval(spawnRandomPowerup, 6000);
+
             if (!(currentMode === 'level' && isBossLevel)) {
                 let initialSpawnRate = 1800;
                 if(currentMode === 'rush') { initialSpawnRate = 1500; window.rushSpawnRate = 1500; } 
@@ -937,7 +999,7 @@
         };
 
         window.levelClear = function() {
-            gameActive = false; bossActive = false; clearInterval(spawnInterval);
+            gameActive = false; bossActive = false; clearInterval(spawnInterval); clearInterval(powerupInterval);
             let reward = GameData.level.currentLevel * 15;
             if (isBossLevel) reward *= 5; 
             
@@ -1163,6 +1225,15 @@
             powerups.push({ mesh, type, rotationSpeed: 0.05, life: 600 }); 
         }
 
+        function spawnRandomPowerup() {
+            if (!gameActive || isPaused) return;
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * (MAP_RADIUS - 20); 
+            const x = Math.cos(angle) * distance;
+            const z = Math.sin(angle) * distance;
+            spawnPowerup(new THREE.Vector3(x, 0, z));
+        }
+
         function activatePowerup(type) {
             if (type === 'magnet') {
                 for (let i = loot.length - 1; i >= 0; i--) {
@@ -1209,7 +1280,6 @@
             let actualFireRate = weapon.fireRate;
             if (rapidFireTimer > 0) actualFireRate /= 2; 
 
-            // 應用射速升級 (每升級1級減少 8% 冷卻時間)
             const upgradeLvl = getModeData().upgrades.fireRate || 0;
             actualFireRate *= Math.pow(0.92, upgradeLvl);
 
@@ -1271,7 +1341,7 @@
         };
 
         window.endGame = function(reason = 'death') {
-            gameActive = false; bossActive = false; clearInterval(spawnInterval);
+            gameActive = false; bossActive = false; clearInterval(spawnInterval); clearInterval(powerupInterval);
             if(finalScoreEl) finalScoreEl.innerText = score;
             if(finalKillsEl) finalKillsEl.innerText = enemiesKilled;
             
@@ -1306,7 +1376,7 @@
             saveData(); 
         };
 
-        // --- 商店系統邏輯 ---
+        // --- 商店系統邏輯 (針對當前模式讀取與寫入) ---
         window.updateShopUI = function() {
             if(shopCoinsEl) shopCoinsEl.innerText = getModeData().coins;
             
@@ -1405,13 +1475,17 @@
         window.buyWeapon = function(weaponKey) {
             const weapon = WEAPONS[weaponKey];
             if (getModeData().coins >= weapon.cost && !getModeData().weaponsOwned.includes(weaponKey)) {
-                getModeData().coins -= weapon.cost; getModeData().weaponsOwned.push(weaponKey); getModeData().equippedWeapon = weaponKey;
+                getModeData().coins -= weapon.cost;
+                getModeData().weaponsOwned.push(weaponKey); getModeData().equippedWeapon = weaponKey;
                 saveData(); window.updateShopUI(); window.updateUI();
             }
         };
 
         window.buyHeal = function() {
-            if (getModeData().coins >= 50) { getModeData().coins -= 50; getModeData().healthPacks++; saveData(); window.updateShopUI(); window.updateUI(); }
+            if (getModeData().coins >= 50) {
+                getModeData().coins -= 50;
+                getModeData().healthPacks++; saveData(); window.updateShopUI(); window.updateUI(); 
+            }
         };
 
         window.useHealthPack = function() {
@@ -1465,7 +1539,7 @@
             
             window.addEventListener('mousedown', (e) => { 
                 if (!gameActive || isPaused) return; 
-                if (e.target.closest('.btn-pause') || e.target.closest('#healthPackUI') || e.target.closest('.screen-overlay')) return; 
+                if (e.target.closest('.btn-pause') || e.target.closest('#healthPackUI') || e.target.closest('.screen-overlay') || e.target.closest('#musicToggleBtn')) return; 
                 handleAim(e.clientX, e.clientY); 
             });
             window.addEventListener('mousemove', (e) => { if (!gameActive || isPaused) return; if (isFiring) handleAim(e.clientX, e.clientY); });
@@ -1475,7 +1549,7 @@
                 if (!gameActive || isPaused) return;
                 for (let i = 0; i < e.touches.length; i++) {
                     const t = e.touches[i];
-                    if (e.target.closest('.btn-pause') || e.target.closest('#healthPackUI') || e.target.closest('.screen-overlay')) continue; 
+                    if (e.target.closest('.btn-pause') || e.target.closest('#healthPackUI') || e.target.closest('.screen-overlay') || e.target.closest('#musicToggleBtn')) continue; 
                     const isJoystickZone = t.clientX < window.innerWidth / 2 && t.clientY > window.innerHeight / 2;
                     if (isJoystickZone) { e.preventDefault(); input.joystick.active = true; input.joystick.originX = t.clientX; input.joystick.originY = t.clientY; input.joystick.id = t.identifier; }
                     else if (!e.target.closest('.btn') && !e.target.closest('.shop-item')) { handleAim(t.clientX, t.clientY); }
@@ -1583,7 +1657,8 @@
                 if (currentMode === 'rush') points *= 3;
 
                 score += points; spawnCoin(e.mesh.position, coinDrop);
-                if (e.type === 'boss' || Math.random() < 0.08) { spawnPowerup(e.mesh.position); }
+                
+                if (e.type === 'boss') { spawnPowerup(e.mesh.position); }
 
                 scene.remove(e.mesh); enemies.splice(index, 1); 
 
